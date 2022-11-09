@@ -1,17 +1,10 @@
-# import subprocess
-import subprocess
-from functools import partial
-from typing import Type, Dict, List, Any
+from typing import Dict, List, Any
 
 import pandas as pd
 from pandas import DataFrame
 from zenml.steps import Output, step, BaseStep, BaseParameters
 
 from dynamic_pipelines.dynamic_pipeline import DynamicPipeline, PipelineFactory
-
-
-def flatten(l):
-    return [item for sublist in l for item in sublist]
 
 
 class StepsConfiguration(BaseParameters):
@@ -58,17 +51,17 @@ class MyPipeline(DynamicPipeline):
         store_steps = [self.create_indexed_step(store_data, i)() for i in range(self.model_count)]
         return [calc_feature_step] + preprocess_steps + prediction_steps + store_steps
 
-    def connect(self, *args: BaseStep, **kwargs: BaseStep) -> None:
-        calc_features_step = self.get_step(calc_features, **kwargs)
+    def connect(self, **steps) -> None:
+        calc_features_step = self.get_step(calc_features)
         data = calc_features_step()
         for i in range(self.model_count):
-            preprocess_step = self.get_step(preprocess_data, i, **kwargs)
+            preprocess_step = self.get_step(preprocess_data, i)
             preprocessed_data = preprocess_step(data)
 
-            predict_step = self.get_step(predict_data, i, **kwargs)
+            predict_step = self.get_step(predict_data, i)
             predicted_data = predict_step(preprocessed_data)
 
-            store_step = self.get_step(store_data, i, **kwargs)
+            store_step = self.get_step(store_data, i)
             store_step(predicted_data)
 
 
