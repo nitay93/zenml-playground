@@ -1,4 +1,4 @@
-FROM zenmldocker/zenml:0.20.5
+FROM zenmldocker/zenml:0.22.0
 
 COPY . /workspace
 WORKDIR /workspace
@@ -11,3 +11,4 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove gcc libc6-dev
 
 RUN zenml stack set default
+RUN zenml init

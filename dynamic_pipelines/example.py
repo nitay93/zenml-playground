@@ -4,13 +4,12 @@ import pandas as pd
 from pandas import DataFrame
 from zenml.steps import Output, step, BaseStep, BaseParameters
 
-from dynamic_pipelines.dynamic_pipeline import DynamicPipeline, PipelineFactory
+from dynamic_pipelines.dynamic_pipeline import DynamicPipeline
 
 
 class StepsConfiguration(BaseParameters):
     product: str
     model_id: int = 0
-
 
 
 @step
@@ -41,14 +40,13 @@ class MyPipeline(DynamicPipeline):
         self.product_name = product_name
         super().__init__(**kwargs)
 
-    @property
-    def dynamic_steps(self) -> List[BaseStep]:
+    def initialize_steps(self) -> List[BaseStep]:
         calc_feature_step = calc_features(StepsConfiguration(product=self.product_name))
-        preprocess_steps = [self.create_indexed_step(preprocess_data, i)(StepsConfiguration(
+        preprocess_steps = [self.create_step(preprocess_data, i)(StepsConfiguration(
             product=self.product_name,
             model_id=i)) for i in range(self.model_count)]
-        prediction_steps = [self.create_indexed_step(predict_data, i)() for i in range(self.model_count)]
-        store_steps = [self.create_indexed_step(store_data, i)() for i in range(self.model_count)]
+        prediction_steps = [self.create_step(predict_data, i)() for i in range(self.model_count)]
+        store_steps = [self.create_step(store_data, i)() for i in range(self.model_count)]
         return [calc_feature_step] + preprocess_steps + prediction_steps + store_steps
 
     def connect(self, **steps) -> None:
@@ -67,10 +65,14 @@ class MyPipeline(DynamicPipeline):
 
 def define_my_pipelines(conf: Dict[str, int]):
     for product_name, number_of_models in conf.items():
-        product_pipeline = PipelineFactory(f"{product_name}_pipeline", pipeline_template=MyPipeline)
+        product_pipeline = MyPipeline.as_template_of(f"{product_name}_pipeline")
         yield product_pipeline(model_count=number_of_models, product_name=product_name)
+
 
 
 if __name__ == '__main__':
     for pipeline in define_my_pipelines(conf={'sm': 5, 'cc': 4}):
         pipeline.run()
+    # # MyPipeline(model_count=5, product_name='sm').run()
+    # RFHyperParameterTuning(RandomForestClassifierParameters(n_estimators=100),
+    #                        RandomForestClassifierParameters(n_estimators=200)).run()
