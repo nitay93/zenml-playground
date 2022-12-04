@@ -1,4 +1,4 @@
-from typing import List, Any, Type
+from typing import List, Any, Type, Iterable
 
 import numpy as np
 from sklearn import datasets, metrics
@@ -76,17 +76,33 @@ class HyperParameterTuning(DynamicPipeline):
         self.train_and_predict_step = train_and_predict_step
         self.evaluate_step = evaluate_step
         self.params_list = params_list
-        self.gather_evaluation_step = print_score.gather_steps_like(prefix=self.get_step_name(self.evaluate_step))
+        self.gather_evaluation_step = print_score.gather_steps_like(prefix=self.get_prefix(self.evaluate_step))
         super().__init__(**kwargs)
 
-    def initialize_steps(self) -> List[BaseStep]:
-        yield self.create_step(self.load_data_step)()
+    # def initialize_steps(self) -> List[BaseStep]:
+    #     yield self.create_step(self.load_data_step)()
+    #
+    #     for i, params in enumerate(self.params_list):
+    #         yield self.create_step(split_data, i)()
+    #         yield self.create_step(self.train_and_predict_step, i)(params)
+    #         yield self.create_step(self.evaluate_step, i)(TuningPhaseParam(name=params.json()))
+    #     yield self.create_step(self.gather_evaluation_step)(ReduceScoreParams(reduce_max=True))
 
-        for i, params in enumerate(self.params_list):
-            yield self.create_step(split_data, i)()
-            yield self.create_step(self.train_and_predict_step, i)(params)
-            yield self.create_step(self.evaluate_step, i)(TuningPhaseParam(name=params.json()))
-        yield self.create_step(self.gather_evaluation_step)(ReduceScoreParams(reduce_max=True))
+    # def initialize_steps(self) -> Iterable[BaseStep]:
+    #     yield self.load_data_step()
+    #     for i, params in enumerate(self.params_list):
+    #         yield split_data()
+    #         yield self.train_and_predict_step(params)
+    #         yield self.evaluate_step(TuningPhaseParam(name=params.json()))
+    #     yield self.gather_evaluation_step(ReduceScoreParams(reduce_max=True))
+
+    def init_steps(self) -> None:
+        self.init_step(self.load_data_step)
+        for params in self.params_list:
+            self.init_step(split_data)
+            self.init_step(self.train_and_predict_step, params)
+            self.init_step(self.evaluate_step, TuningPhaseParam(name=params.json()))
+        self.init_step(self.gather_evaluation_step, ReduceScoreParams(reduce_max=True))
 
     def connect(self, **steps: BaseStep) -> None:
         X, y = self.get_step(self.load_data_step)()

@@ -40,7 +40,7 @@ class MyPipeline(DynamicPipeline):
         self.product_name = product_name
         super().__init__(**kwargs)
 
-    def initialize_steps(self) -> List[BaseStep]:
+    def init_steps(self) -> List[BaseStep]:
         calc_feature_step = calc_features(StepsConfiguration(product=self.product_name))
         preprocess_steps = [self.create_step(preprocess_data, i)(StepsConfiguration(
             product=self.product_name,

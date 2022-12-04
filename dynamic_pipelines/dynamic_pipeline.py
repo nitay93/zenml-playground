@@ -3,34 +3,53 @@ from functools import partial
 from typing import Any, List, Type, Union, Tuple, Iterable
 
 from zenml.pipelines import BasePipeline
-from zenml.steps import BaseStep
+from zenml.steps import BaseStep, BaseParameters
 
 
 class DynamicPipeline(BasePipeline):
     def __init__(self, **kwargs: Any):
-        # steps = self.initialize_steps()
+        self.steps_dict = {}
+        self.steps_list = []
+        self.init_steps()
         if type(self).STEP_SPEC != {}:
             raise RuntimeError(f"A dynamic pipeline {self.__class__.__name__} was already initialized. Consider using "
                                f"PipelineFactory to generate a new pipeline based on a pipeline template.")
-        type(self).STEP_SPEC = {s.name: type(s) for s in self.dynamic_steps}
-        super().__init__(*self.dynamic_steps, **kwargs)
+        type(self).STEP_SPEC = {s.name: type(s) for s in self.steps_list}
+        super().__init__(*self.steps_list, **kwargs)
 
-    @property
-    @abstractmethod
-    def dynamic_steps(self) -> List[BaseStep]:
-        return list(self.initialize_steps())
+    def init_step(self, step: Type[BaseStep], param: BaseParameters = None, name: Any = None):
+        if step.__name__ not in self.steps_dict:
+            self.steps_dict[step.__name__] = {}
+
+        if name is None:
+            index = 0 if self.steps_dict[step.__name__] == {} \
+                else max([k for k in self.steps_dict[step.__name__].keys() if isinstance(k, int)]) + 1
+            self._add_new_step(step, param, index)
+        elif name not in self.steps_dict[step.__name__]:
+            self._add_new_step(step, param, name)
+        else:
+            raise ValueError(f"step with {name} already exists")
+
+    def _add_new_step(self, step: Type[BaseStep], param: BaseParameters = None, name: Any = None):
+        step_name = self.get_step_name(step, name)
+        self.steps_dict[step.__name__][name] = step(name=step_name) if param is None else step(param, name=step_name)
+        self.steps_list.append(self.steps_dict[step.__name__][name])
 
     @abstractmethod
-    def initialize_steps(self) -> Iterable[BaseStep]:
+    def init_steps(self) -> None:
         pass
 
-    @classmethod
-    def create_step(cls, step: Type[BaseStep], step_id: Any = None):
-        return partial(step, name=cls.get_step_name(step, step_id))
+    # @classmethod
+    # def create_step(cls, step: Type[BaseStep], step_id: Any = None):
+    #     return partial(step, name=cls.get_step_name(step, step_id))
 
     @staticmethod
-    def get_step_name(step: Type[BaseStep], step_id: Any = None):
-        return step.__name__ if step_id is None else f"{step.__name__}_{step_id}"
+    def get_prefix(step: Type[BaseStep]):
+        return step.__name__
+
+    @classmethod
+    def get_step_name(cls, step: Type[BaseStep], step_id: Any = 0):
+        return cls.get_prefix(step) if step_id is None else f"{cls.get_prefix(step)}_{step_id}"
 
     def get_step(self, step: Type[BaseStep], step_id: Any = None) -> BaseStep:
         return self.steps[self.get_step_name(step, step_id)]
