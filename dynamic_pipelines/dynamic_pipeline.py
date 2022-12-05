@@ -1,36 +1,44 @@
+import functools
+import uuid
 from abc import abstractmethod
 from functools import partial
 from typing import Any, List, Type, Union, Tuple, Iterable
 
 from zenml.pipelines import BasePipeline
-from zenml.steps import BaseStep
+from zenml.steps import BaseStep, BaseParameters
+
+from dynamic_pipelines.gather_step import GatherSteps
 
 
 class DynamicPipeline(BasePipeline):
-    def __init__(self, **kwargs: Any):
-        # steps = self.initialize_steps()
+    def __init__(self, *steps: BaseStep, **kwargs: Any):
         if type(self).STEP_SPEC != {}:
             raise RuntimeError(f"A dynamic pipeline {self.__class__.__name__} was already initialized. Consider using "
                                f"PipelineFactory to generate a new pipeline based on a pipeline template.")
-        type(self).STEP_SPEC = {s.name: type(s) for s in self.dynamic_steps}
-        super().__init__(*self.dynamic_steps, **kwargs)
+        type(self).STEP_SPEC = {s.name: type(s) for s in steps}
+        super().__init__(*steps, **kwargs)
 
-    @property
-    @abstractmethod
-    def dynamic_steps(self) -> List[BaseStep]:
-        return list(self.initialize_steps())
-
-    @abstractmethod
-    def initialize_steps(self) -> Iterable[BaseStep]:
-        pass
+    def new_step(self, step: Type[BaseStep], step_id: Any = None, param: BaseParameters = None) -> BaseStep:
+        named_step = self.named_step(step, step_id)
+        return named_step() if param is None else named_step(param)
 
     @classmethod
-    def create_step(cls, step: Type[BaseStep], step_id: Any = None):
-        return partial(step, name=cls.get_step_name(step, step_id))
+    def named_step(cls, step: Type[BaseStep], step_id: Any = None) -> functools.partial:
+        name = uuid.uuid1().hex if step_id is None else step_id
+        return partial(step, name=cls.get_step_name(step, name))
 
     @staticmethod
-    def get_step_name(step: Type[BaseStep], step_id: Any = None):
-        return step.__name__ if step_id is None else f"{step.__name__}_{step_id}"
+    def get_prefix(step: Type[BaseStep]) -> str:
+        return step.__name__
+
+    @classmethod
+    def get_step_name(cls, step: Type[BaseStep], step_id: Any = None) -> str:
+        return cls.get_prefix(step) if step_id is None else f"{cls.get_prefix(step)}_{step_id}"
+
+    def define_gather_step(self, gather_step: GatherSteps, by_type: Type[BaseStep] = None,
+                           by_names: List[str] = None):
+        return gather_step.gather_steps_like(prefix=None if by_type is None else self.get_prefix(by_type),
+                                             step_names=by_names)
 
     def get_step(self, step: Type[BaseStep], step_id: Any = None) -> BaseStep:
         return self.steps[self.get_step_name(step, step_id)]
