@@ -1,14 +1,9 @@
-FROM zenmldocker/zenml:0.22.0
+FROM python:3.9-slim
 
 COPY . /workspace
 WORKDIR /workspace
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends gcc libc6-dev \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install "cython>=0.29.21,<1.0.0" \
-    && pip install -r requirements.txt \
-    && apt-get purge -y --auto-remove gcc libc6-dev
+RUN pip install -r requirements.txt
 
-RUN zenml stack set default
-RUN zenml init
+#RUN zenml stack set default
+#RUN zenml init
