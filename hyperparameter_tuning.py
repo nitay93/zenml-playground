@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from zenml.steps import BaseParameters, step, BaseStep, Output
 
 from dynamic_pipelines.dynamic_pipeline import DynamicPipeline
-from dynamic_pipelines.gather_step import gather_step, GatherParameters
+from dynamic_pipelines.gather_step import OutputParameters, GatherStepsParameters
 
 
 class RandomForestClassifierParameters(BaseParameters):
@@ -40,7 +40,7 @@ class TuningPhaseParam(BaseParameters):
     name: str
 
 
-class EvaluationOutputParams(GatherParameters):
+class EvaluationOutputParams(OutputParameters):
     score: float
     metric_name: str
     tuning_phase: str
@@ -54,13 +54,15 @@ def calc_accuracy(param: TuningPhaseParam, y_test: np.ndarray, y_pred: np.ndarra
     return metrics.accuracy_score(y_test, y_pred), "accuracy", param.name
 
 
-class ReduceScoreParams(BaseParameters):
+class CompareScoreParams(GatherStepsParameters):
     reduce_min: bool = False
     reduce_max: bool = False
 
 
-@gather_step(gather_outputs_of_type=EvaluationOutputParams)
-def compare_score_gather_step(params: ReduceScoreParams, outputs: List[EvaluationOutputParams]) -> None:
+@step
+def compare_score(params: CompareScoreParams) -> None:
+    outputs = EvaluationOutputParams.extract(params)
+
     scores = []
     for output in outputs:
         print(f"For {output.score} : {output.metric_name}={output.score}")
@@ -85,8 +87,8 @@ class HyperParameterTuning(DynamicPipeline):
                               self.new_step(evaluate_step, param=TuningPhaseParam(name=str(param))))
                              for param in params_list]
 
-        compare_scores_step = self.define_gather_step(compare_score_gather_step, by_type=evaluate_step)
-        self.compare_scores = compare_scores_step(ReduceScoreParams(reduce_max=True))
+        self.compare_scores = compare_score(
+            CompareScoreParams(reduce_max=True, output_steps_prefix=self.get_prefix(evaluate_step)))
 
         super().__init__(self.load_data_step,
                          self.compare_scores,
