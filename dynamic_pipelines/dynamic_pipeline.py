@@ -1,13 +1,10 @@
 import functools
 import uuid
-from abc import abstractmethod
 from functools import partial
-from typing import Any, List, Type, Union, Tuple, Iterable
+from typing import Any, List, Type, Tuple, Iterable
 
 from zenml.pipelines import BasePipeline
 from zenml.steps import BaseStep, BaseParameters
-
-from dynamic_pipelines.gather_step import GatherSteps
 
 
 class DynamicPipeline(BasePipeline):
@@ -35,11 +32,6 @@ class DynamicPipeline(BasePipeline):
     def get_step_name(cls, step: Type[BaseStep], step_id: Any = None) -> str:
         return cls.get_prefix(step) if step_id is None else f"{cls.get_prefix(step)}_{step_id}"
 
-    def define_gather_step(self, gather_steps: GatherSteps, by_type: Type[BaseStep] = None,
-                           by_names: List[str] = None):
-        return gather_steps.gather_steps_like(prefix=None if by_type is None else self.get_prefix(by_type),
-                                              step_names=by_names)
-
     def get_step(self, step: Type[BaseStep], step_id: Any = None) -> BaseStep:
         return self.steps[self.get_step_name(step, step_id)]
 
@@ -48,5 +40,4 @@ class DynamicPipeline(BasePipeline):
 
     @classmethod
     def as_template_of(cls, pipeline_name: str, **kwargs):
-        return type(pipeline_name, (cls, ), kwargs)
-
+        return type(pipeline_name, (cls,), kwargs)
