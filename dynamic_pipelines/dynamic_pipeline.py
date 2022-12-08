@@ -10,8 +10,9 @@ from zenml.steps import BaseStep, BaseParameters
 class DynamicPipeline(BasePipeline):
     def __init__(self, *steps: BaseStep, **kwargs: Any):
         if type(self).STEP_SPEC != {}:
-            raise RuntimeError(f"A dynamic pipeline {self.__class__.__name__} was already initialized. Consider using "
-                               f"PipelineFactory to generate a new pipeline based on a pipeline template.")
+            raise RuntimeError(f"A dynamic pipeline {self.__class__.__name__} was already initialized. "
+                               f"Consider generating new pipelines based on this template with "
+                               f"{self.__class__.__name__}.{self.as_template_of.__name__}()")
         type(self).STEP_SPEC = {s.name: type(s) for s in steps}
         super().__init__(*steps, **kwargs)
 
@@ -40,4 +41,4 @@ class DynamicPipeline(BasePipeline):
 
     @classmethod
     def as_template_of(cls, pipeline_name: str, **kwargs):
-        return type(pipeline_name, (cls,), kwargs)
+        return type(pipeline_name, (cls,), {})(**kwargs)
