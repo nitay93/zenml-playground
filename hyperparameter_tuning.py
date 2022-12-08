@@ -82,7 +82,7 @@ class HyperParameterTuning(DynamicPipeline):
         self.load_data_step = load_data_step()
         self.tuning_steps = [(self.new_step(split_data_step),
                               self.new_step(train_and_predict_step, param=param),
-                              self.new_step(evaluate_step, param=TuningPhaseParam(name=param.json())))
+                              self.new_step(evaluate_step, param=TuningPhaseParam(name=str(param))))
                              for param in params_list]
 
         compare_scores_step = self.define_gather_step(compare_score_gather_step, by_type=evaluate_step)
@@ -110,4 +110,4 @@ if __name__ == '__main__':
         train_and_predict_step=train_and_predict_rf_classifier,
         evaluate_step=calc_accuracy,
         params_list=[RandomForestClassifierParameters(n_estimators=100),
-                     RandomForestClassifierParameters(n_estimators=200)]).run()
+                     RandomForestClassifierParameters(n_estimators=200)]).run(unlisted=True, enable_cache=False)

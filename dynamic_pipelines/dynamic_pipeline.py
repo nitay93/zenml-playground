@@ -35,10 +35,10 @@ class DynamicPipeline(BasePipeline):
     def get_step_name(cls, step: Type[BaseStep], step_id: Any = None) -> str:
         return cls.get_prefix(step) if step_id is None else f"{cls.get_prefix(step)}_{step_id}"
 
-    def define_gather_step(self, gather_step: GatherSteps, by_type: Type[BaseStep] = None,
+    def define_gather_step(self, gather_steps: GatherSteps, by_type: Type[BaseStep] = None,
                            by_names: List[str] = None):
-        return gather_step.gather_steps_like(prefix=None if by_type is None else self.get_prefix(by_type),
-                                             step_names=by_names)
+        return gather_steps.gather_steps_like(prefix=None if by_type is None else self.get_prefix(by_type),
+                                              step_names=by_names)
 
     def get_step(self, step: Type[BaseStep], step_id: Any = None) -> BaseStep:
         return self.steps[self.get_step_name(step, step_id)]
