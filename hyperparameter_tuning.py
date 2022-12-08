@@ -22,6 +22,12 @@ def load_iris_data() -> Output(X=np.ndarray, y=np.ndarray):
 
 
 @step
+def load_breast_cancer() -> Output(X=np.ndarray, y=np.ndarray):
+    breast_cancer_data = datasets.load_breast_cancer()
+    return breast_cancer_data.data, breast_cancer_data.target
+
+
+@step
 def split_data_step(X: np.ndarray, y: np.ndarray) -> Output(X_train=np.ndarray, X_test=np.ndarray, y_train=np.ndarray,
                                                             y_test=np.ndarray):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
@@ -37,7 +43,7 @@ def train_and_predict_rf_classifier(params: RandomForestClassifierParameters, X_
 
 
 class TuningPhaseParam(BaseParameters):
-    name: str
+    details: str
 
 
 class EvaluationOutputParams(OutputParameters):
@@ -46,12 +52,10 @@ class EvaluationOutputParams(OutputParameters):
     tuning_phase: str
 
 
-evaluation_output = EvaluationOutputParams.as_output()
-
-
 @step
-def calc_accuracy(param: TuningPhaseParam, y_test: np.ndarray, y_pred: np.ndarray) -> evaluation_output:
-    return metrics.accuracy_score(y_test, y_pred), "accuracy", param.name
+def calc_accuracy(param: TuningPhaseParam, y_test: np.ndarray,
+                  y_pred: np.ndarray) -> EvaluationOutputParams.as_output():
+    return metrics.accuracy_score(y_test, y_pred), "accuracy", param.details
 
 
 class CompareScoreParams(GatherStepsParameters):
@@ -84,7 +88,7 @@ class HyperParameterTuning(DynamicPipeline):
         self.load_data_step = load_data_step()
         self.tuning_steps = [(self.new_step(split_data_step),
                               self.new_step(train_and_predict_step, param=param),
-                              self.new_step(evaluate_step, param=TuningPhaseParam(name=str(param))))
+                              self.new_step(evaluate_step, param=TuningPhaseParam(details=str(param))))
                              for param in params_list]
 
         self.compare_scores = compare_score(
@@ -107,9 +111,20 @@ class HyperParameterTuning(DynamicPipeline):
 
 
 if __name__ == '__main__':
-    HyperParameterTuning(
+    HyperParameterTuning.as_template_of(
+        pipeline_name='iris_random_forest',
         load_data_step=load_iris_data,
         train_and_predict_step=train_and_predict_rf_classifier,
         evaluate_step=calc_accuracy,
         params_list=[RandomForestClassifierParameters(n_estimators=100),
                      RandomForestClassifierParameters(n_estimators=200)]).run(unlisted=True, enable_cache=False)
+
+    HyperParameterTuning.as_template_of(
+        pipeline_name='breast_cancer_random_forest',
+        load_data_step=load_breast_cancer,
+        train_and_predict_step=train_and_predict_rf_classifier,
+        evaluate_step=calc_accuracy,
+        params_list=[RandomForestClassifierParameters(n_estimators=100),
+                     RandomForestClassifierParameters(n_estimators=200),
+                     RandomForestClassifierParameters(n_estimators=300)]).run(unlisted=True, enable_cache=False)
+
