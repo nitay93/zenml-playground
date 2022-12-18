@@ -8,14 +8,34 @@ GP = TypeVar("GP", bound="GatherParameters")
 
 
 class GatherStepsParameters(BaseParameters):
+    """
+    Base Parameters class for steps that gather step outputs from an undetermined number of steps.
+    The attributes of this class will be used to filter relevant steps.
+    Attributes:
+        output_steps_prefix: a prefix of step names
+        output_steps_names: a list of step names
+    """
     output_steps_prefix: str = None
     output_steps_names: List[str] = None
 
 
 class OutputParameters(BaseParameters):
+    """
+    A base class for a parameters class to extract the output parameters and value of a step.
+    The attributes of the inheriting concrete class should be equal to the output fields of a step.
+    These output values of steps with these output fields, can be extracted using the method of this class.
+    """
     @staticmethod
-    def _extract(gather_steps_params: GatherStepsParameters) -> List[dict]:
-        run_name = Environment().step_environment.pipeline_run_id
+    def extract_dictionaries(gather_steps_params: GatherStepsParameters) -> List[dict]:
+        """
+        Extract output of steps compatible to the parameters of gather_steps_params.
+        Args:
+            gather_steps_params: The parameters object, to filter the relevant steps.
+
+        Returns:
+            A list of dictionaries of the outputs of the steps.
+        """
+        run_name = Environment().step_environment.run_name
         run = get_run(run_name)
         prefix_steps = [
             s for s in run.steps
@@ -33,8 +53,25 @@ class OutputParameters(BaseParameters):
 
     @classmethod
     def extract(cls: GP, gather_steps_params: GatherStepsParameters) -> List[GP]:
-        return [cls(**o) for o in cls._extract(gather_steps_params)]
+        """
+        Extract output of steps compatible to the parameters of gather_steps_params, and generates an instance of
+        the concrete output class given by cls. The assumption is that the concrete class's constructor accepts all the
+        entries of the output dictionaries of the requested steps.
+        Args:
+            gather_steps_params: The parameters object, to filter the relevant steps.
+
+        Returns:
+            A list of the objects of the output concrete class with the output values of the relevant steps.
+        """
+        return [cls(**o) for o in cls.extract_dictionaries(gather_steps_params)]
 
     @classmethod
     def as_output(cls) -> Output:
+        """
+        Converts the concrete class into a ZenML Output object, so that, the user will not have to specify the same
+        parameters to create both the OutputParameters object for the gather step and the ZenML Output object for the
+        return type of the steps to be gathered.
+        Returns:
+            A ZenML Output object with the same fields and type values as the concrete class.
+        """
         return Output(**{field_name: field.type_ for field_name, field in cls.__fields__.items()})
