@@ -87,8 +87,8 @@ class HyperParameterTuning(DynamicPipeline):
                  evaluate_step: Type[BaseStep], params_list: List[BaseParameters], **kwargs: Any):
         self.load_data_step = load_data_step()
         self.tuning_steps = [(self.new_step(split_data_step),
-                              self.new_step(train_and_predict_step, param=param),
-                              self.new_step(evaluate_step, param=TuningPhaseParam(details=str(param))))
+                              self.new_step(train_and_predict_step, parameters=param),
+                              self.new_step(evaluate_step, parameters=TuningPhaseParam(details=str(param))))
                              for param in params_list]
 
         self.compare_scores = compare_score(
