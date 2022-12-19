@@ -1,4 +1,4 @@
-from typing import List, TypeVar
+from typing import List, TypeVar, Type
 
 from zenml.environment import Environment
 from zenml.post_execution import get_run
@@ -52,7 +52,7 @@ class OutputParameters(BaseParameters):
         ]
 
     @classmethod
-    def extract(cls: GP, gather_steps_params: GatherStepsParameters) -> List[GP]:
+    def extract(cls: Type[GP], gather_steps_params: GatherStepsParameters) -> List[GP]:
         """
         Extract output of steps compatible to the parameters of gather_steps_params, and generates an instance of
         the concrete output class given by cls. The assumption is that the concrete class's constructor accepts all the
