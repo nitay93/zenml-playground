@@ -7,7 +7,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from zenml.steps import BaseParameters, step, BaseStep, Output
 
-from dynamic_pipelines.dynamic_pipeline import DynamicPipeline
+from dynamic_pipelines.dynamic_pipeline import DynamicPipeline, new_step, get_prefix
 from dynamic_pipelines.gather_step import OutputParameters, GatherStepsParameters
 
 
@@ -84,20 +84,25 @@ def compare_score(params: CompareScoreParams) -> None:
 class HyperParameterTuning(DynamicPipeline):
 
     def __init__(self, load_data_step: Type[BaseStep], train_and_predict_step: Type[BaseStep],
-                 evaluate_step: Type[BaseStep], params_list: List[BaseParameters], **kwargs: Any):
+                 evaluate_step: Type[BaseStep], params_list: List[BaseParameters], **kwargs: Any) -> None:
         self.load_data_step = load_data_step()
-        self.tuning_steps = [(self.new_step(split_data_step),
-                              self.new_step(train_and_predict_step, parameters=param),
-                              self.new_step(evaluate_step, parameters=TuningPhaseParam(details=str(param))))
+        self.tuning_steps = [(new_step(split_data_step, step_id=self.param_id(param)),
+                              new_step(train_and_predict_step, step_id=self.param_id(param), parameters=param),
+                              new_step(evaluate_step, step_id=self.param_id(param),
+                                       parameters=TuningPhaseParam(details=str(param))))
                              for param in params_list]
 
         self.compare_scores = compare_score(
-            CompareScoreParams(reduce_max=True, output_steps_prefix=self.get_prefix(evaluate_step)))
+            CompareScoreParams(reduce_max=True, output_steps_prefix=get_prefix(evaluate_step)))
 
         super().__init__(self.load_data_step,
                          self.compare_scores,
                          *chain.from_iterable(self.tuning_steps),
                          **kwargs)
+
+    @staticmethod
+    def param_id(parameters: BaseParameters) -> str:
+        return '_'.join([str(x) for x in parameters.dict().values()])
 
     def connect(self, **steps: BaseStep) -> None:
         X, y = self.load_data_step()
@@ -111,20 +116,17 @@ class HyperParameterTuning(DynamicPipeline):
 
 
 if __name__ == '__main__':
-    HyperParameterTuning.as_template_of(
-        pipeline_name='iris_random_forest',
+    HyperParameterTuning.as_template_of('iris_random_forest')(
         load_data_step=load_iris_data,
         train_and_predict_step=train_and_predict_rf_classifier,
         evaluate_step=calc_accuracy,
         params_list=[RandomForestClassifierParameters(n_estimators=100),
                      RandomForestClassifierParameters(n_estimators=200)]).run(unlisted=True, enable_cache=False)
 
-    HyperParameterTuning.as_template_of(
-        pipeline_name='breast_cancer_random_forest',
+    HyperParameterTuning.as_template_of('breast_cancer_random_forest')(
         load_data_step=load_breast_cancer,
         train_and_predict_step=train_and_predict_rf_classifier,
         evaluate_step=calc_accuracy,
         params_list=[RandomForestClassifierParameters(n_estimators=100),
                      RandomForestClassifierParameters(n_estimators=200),
                      RandomForestClassifierParameters(n_estimators=300)]).run(unlisted=True, enable_cache=False)
-
