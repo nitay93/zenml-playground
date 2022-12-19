@@ -1,87 +1,61 @@
 import uuid
-from abc import ABC
+from abc import abstractmethod
 from functools import partial
-from typing import Any, Type, TypeVar
+from typing import Any, Type, Iterable
 
+from pydantic import BaseModel
 from zenml.pipelines import BasePipeline
+from zenml.pipelines.base_pipeline import PIPELINE_INNER_FUNC_NAME
 from zenml.steps import BaseStep, BaseParameters
 
 
-DP = TypeVar("DP", bound="DynamicPipeline")
+def register_steps(pipeline: Type[BasePipeline], steps: Iterable[BaseStep]):
+    """
+    Registers the steps to the pipeline class with initialization of STEP_SPEC.
+    Args:
+        pipeline: the pipeline type to register the steps to
+        steps: a list of steps to register to the pipeline
+
+    """
+    if pipeline.STEP_SPEC != {}:
+        raise RuntimeError(f"Steps for pipeline {pipeline} were already initialized"
+                           f"Consider generating new pipelines based on this template with ...")
+    pipeline.STEP_SPEC = {s.name: type(s) for s in steps}
 
 
-class DynamicPipeline(BasePipeline):
-    """Abstract class for dynamic ZenML pipelines, enabling creation of pipeline templates without predefining
-    the exact number of steps the pipeline can depend on.
+def new_step(step: Type[BaseStep], step_id: Any = None, parameters: BaseParameters = None) -> BaseStep:
+    """
+    Creates a new step with modified name. Useful to create multiple steps of the same type with different names,
+    so that they can be used in the same pipeline.
+    Args:
+        step: the type of the new step to create.
+        step_id: an id to be used to create a new name for the step. If not provided, generates a random uuid.
+        parameters: optional parameters object for the step initialization.
 
-        """
+    Returns:
+        The new step instance generated.
+    """
+    name = uuid.uuid1().hex if step_id is None else step_id
+    named_step = partial(step, name=step.__name__ if name is None else f"{step.__name__}_{name}")
+    return named_step() if parameters is None else named_step(parameters)
 
-    def __init__(self, *steps: BaseStep, **kwargs: Any):
-        """
-        Initializes the dynamic pipeline
-        Args:
-            *steps: the steps to be executed by this pipeline
-            **kwargs: the configuration of this pipeline
-        """
-        if type(self).STEP_SPEC != {}:
-            raise RuntimeError(f"A dynamic pipeline {self.__class__.__name__} was already initialized. "
-                               f"Consider generating new pipelines based on this template with "
-                               f"{self.__class__.__name__}.{self.as_template_of.__name__}()")
-        type(self).STEP_SPEC = {s.name: type(s) for s in steps}
-        super().__init__(*steps, **kwargs)
 
-    @classmethod
-    def new_step(cls, step: Type[BaseStep], step_id: Any = None, parameters: BaseParameters = None) -> BaseStep:
-        """
-        Creates a new step with modified name. Useful to create multiple steps of the same type with different names,
-        so that they can be used in the same pipeline.
-        Args:
-            step: the type of the new step to create.
-            step_id: an id to be used to create a new name for the step. If not provided, generates a random uuid.
-            parameters: optional parameters object for the step initialization.
+def clone_pipeline(pipeline: Type[BasePipeline], name: str, **kwargs):
+    """
+    Clones a pipeline type. Useful for dynamic pipeline for which the steps specification is determined only at
+    initialization.
+    Args:
+        pipeline: the type of pipeline to be cloned.
+        name: the name of the new pipeline
+        **kwargs: a dictionary of arguments to add to the type constructor.
 
-        Returns:
-            The new step instance generated.
-        """
-        name = uuid.uuid1().hex if step_id is None else step_id
-        named_step = partial(step, name=cls.get_step_name(step, name))
-        return named_step() if parameters is None else named_step(parameters)
+    Returns:
+    A new pipeline type named by according to the input name that directly inherits from the input pipeline.
+    """
+    return type(name, (pipeline,), kwargs)
 
-    @staticmethod
-    def get_prefix(step: Type[BaseStep]) -> str:
-        """
-        The prefix of the names that are generated for specific step types.
-        Args:
-            step: The type of the step.
 
-        Returns:
-            The steps name prefix
-        """
-        return step.__name__
-
-    @classmethod
-    def get_step_name(cls, step: Type[BaseStep], step_id: Any = None) -> str:
-        """
-        Generates a name for a step based on the step type and a step_id.
-        Args:
-            step: the step type.
-            step_id: the step id.
-
-        Returns:
-            The name of the step.
-        """
-        return cls.get_prefix(step) if step_id is None else f"{cls.get_prefix(step)}_{step_id}"
-
-    @classmethod
-    def as_template_of(cls: DP, pipeline_name: str, **kwargs) -> DP:
-        """
-        Generates a new type of pipeline the directly inherits from the current dynamic pipeline.
-        This is useful to create multiple dynamic pipelines based on dynamic pipeline class.
-        Args:
-            pipeline_name: The name of the new pipeline instance.
-            **kwargs: the configuration of this pipeline
-
-        Returns:
-            The new pipeline instance generated.
-        """
-        return type(pipeline_name, (cls,), {})(**kwargs)
+class DynamicSteps:
+    @abstractmethod
+    def steps(self):
+        pass
